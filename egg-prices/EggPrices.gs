@@ -3,9 +3,14 @@ const SHEET_NAME = 'PriceHistory';
 
 function updateEggPrices() {
   const key = PropertiesService.getScriptProperties().getProperty('BLS_API_KEY');
-  const url = 'https://api.bls.gov/publicAPI/v2/timeseries/data/' + SERIES_ID;
+  const url = 'https://api.bls.gov/publicAPI/v2/timeseries/data/';
+  const endYear = new Date().getFullYear();
   const payload = { seriesid: [SERIES_ID] };
-  if (key) payload.registrationkey = key;
+  if (key) {
+    payload.registrationkey = key;
+    payload.startyear = String(endYear - 19);
+    payload.endyear = String(endYear);
+  }
 
   const resp = UrlFetchApp.fetch(url, {
     method: 'post',
