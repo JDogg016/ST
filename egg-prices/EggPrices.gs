@@ -58,9 +58,13 @@ function doPost(e) {
   const date = data.date ? new Date(data.date) : new Date();
   if (isNaN(date.getTime())) return reject(400, 'bad date');
 
-  SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME).appendRow([eggs, date]);
+  const sheet = SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME);
+  const lastDataInA = sheet.getRange(sheet.getMaxRows(), 1)
+    .getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
+  const targetRow = Math.max(lastDataInA + 1, 22);
+  sheet.getRange(targetRow, 1, 1, 2).setValues([[eggs, date]]);
 
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString() }))
+    .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString(), row: targetRow }))
     .setMimeType(ContentService.MimeType.JSON);
 }
