@@ -61,10 +61,37 @@ function doPost(e) {
   const sheet = SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME);
   const targetRow = nextLogRow(sheet);
   sheet.getRange(targetRow, 1, 1, 2).setValues([[eggs, date]]);
+  SpreadsheetApp.flush();
+
+  const summary = [
+    `Logged ${eggs} egg${eggs === 1 ? '' : 's'}`,
+    `Total: ${formatCount(sheet.getRange('D2').getValue())}`,
+    `Saved: ${formatMoney(sheet.getRange('G2').getValue())}`,
+    `Free eggs: ${formatDate(sheet.getRange('I7').getValue())}`,
+  ].join('\n');
 
   return ContentService
-    .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString(), row: targetRow }))
+    .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString(), row: targetRow, summary }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+function formatCount(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? Math.round(n).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') : String(v);
+}
+
+function formatMoney(v) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return String(v);
+  const [whole, dec] = n.toFixed(2).split('.');
+  return '$' + whole.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + '.' + dec;
+}
+
+function formatDate(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'MMMM d, yyyy');
+  }
+  return String(v);
 }
 
 const FOOD_EXPENSE = 40;
