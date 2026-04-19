@@ -59,12 +59,47 @@ function doPost(e) {
   if (isNaN(date.getTime())) return reject(400, 'bad date');
 
   const sheet = SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME);
-  const lastDataInA = sheet.getRange(sheet.getMaxRows(), 1)
-    .getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
-  const targetRow = Math.max(lastDataInA + 1, 22);
+  const targetRow = nextLogRow(sheet);
   sheet.getRange(targetRow, 1, 1, 2).setValues([[eggs, date]]);
 
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString(), row: targetRow }))
     .setMimeType(ContentService.MimeType.JSON);
+}
+
+const FOOD_EXPENSE = 40;
+const FOOD_INTERVAL_DAYS = 30;
+
+function addChickenFood() {
+  const sheet = SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME);
+  const maxRow = sheet.getMaxRows();
+
+  const eValues = sheet.getRange(22, 5, maxRow - 21, 1).getValues();
+  let lastFoodRow = -1;
+  for (let i = eValues.length - 1; i >= 0; i--) {
+    if (Number(eValues[i][0]) === FOOD_EXPENSE) {
+      lastFoodRow = 22 + i;
+      break;
+    }
+  }
+
+  const now = new Date();
+  if (lastFoodRow > 0) {
+    const lastDate = sheet.getRange(lastFoodRow, 2).getValue();
+    if (lastDate instanceof Date) {
+      const daysSince = (now - lastDate) / 86400000;
+      if (daysSince < FOOD_INTERVAL_DAYS) return;
+    }
+  }
+
+  const targetRow = nextLogRow(sheet);
+  sheet.getRange(targetRow, 2).setValue(now);
+  sheet.getRange(targetRow, 5).setValue(FOOD_EXPENSE);
+}
+
+function nextLogRow(sheet) {
+  const maxRow = sheet.getMaxRows();
+  const lastA = sheet.getRange(maxRow, 1).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
+  const lastB = sheet.getRange(maxRow, 2).getNextDataCell(SpreadsheetApp.Direction.UP).getRow();
+  return Math.max(lastA, lastB, 21) + 1;
 }
