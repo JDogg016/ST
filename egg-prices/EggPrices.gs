@@ -1,5 +1,6 @@
 const SERIES_ID = 'APU0000708111';
 const SHEET_NAME = 'PriceHistory';
+const LOG_SHEET_NAME = 'Sheet1';
 
 function updateEggPrices() {
   const key = PropertiesService.getScriptProperties().getProperty('BLS_API_KEY');
@@ -37,4 +38,29 @@ function updateEggPrices() {
   if (rows.length) sheet.getRange(2, 1, rows.length, 4).setValues(rows);
   sheet.getRange('A:A').setNumberFormat('yyyy-mm-dd');
   sheet.getRange('B:C').setNumberFormat('$0.000');
+}
+
+function doPost(e) {
+  const reject = (status, msg) => ContentService
+    .createTextOutput(JSON.stringify({ ok: false, error: msg }))
+    .setMimeType(ContentService.MimeType.JSON);
+
+  let data;
+  try { data = JSON.parse(e.postData.contents); }
+  catch (err) { return reject(400, 'invalid json'); }
+
+  const expected = PropertiesService.getScriptProperties().getProperty('WEBHOOK_TOKEN');
+  if (!expected || data.token !== expected) return reject(401, 'unauthorized');
+
+  const eggs = Number(data.eggs);
+  if (!Number.isFinite(eggs) || eggs < 0) return reject(400, 'bad eggs');
+
+  const date = data.date ? new Date(data.date) : new Date();
+  if (isNaN(date.getTime())) return reject(400, 'bad date');
+
+  SpreadsheetApp.getActive().getSheetByName(LOG_SHEET_NAME).appendRow([eggs, date]);
+
+  return ContentService
+    .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString() }))
+    .setMimeType(ContentService.MimeType.JSON);
 }
