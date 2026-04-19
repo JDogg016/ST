@@ -63,12 +63,10 @@ function doPost(e) {
   sheet.getRange(targetRow, 1, 1, 2).setValues([[eggs, date]]);
   SpreadsheetApp.flush();
 
-  const summary = [
-    `Logged ${eggs} egg${eggs === 1 ? '' : 's'}`,
-    `Total: ${formatCount(sheet.getRange('D2').getValue())}`,
-    `Saved: ${formatMoney(sheet.getRange('G2').getValue())}`,
-    `Free eggs: ${formatDate(sheet.getRange('I7').getValue())}`,
-  ].join('\n');
+  const total = formatCount(sheet.getRange('D2').getValue());
+  const saved = formatMoney(sheet.getRange('G2').getValue());
+  const freeDate = formatDate(sheet.getRange('I7').getValue());
+  const summary = `You got ${eggs} egg${eggs === 1 ? '' : 's'}, to date you've gotten ${total} eggs and saved ${saved} in egg purchases. At this rate you will enjoy Free eggs on ${freeDate}`;
 
   return ContentService
     .createTextOutput(JSON.stringify({ ok: true, eggs, date: date.toISOString(), row: targetRow, summary }))
