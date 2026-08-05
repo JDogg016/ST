@@ -58,6 +58,28 @@ Guest and the second would become `person.guest_2`. If you later want the
 longer grace period, install the package with those two blocks deleted and
 repoint the helper's `in_zones` at `binary_sensor.gorcho_guests_online`.
 
+### Or let a script do it
+
+[`scripts/create_guest_presence.py`](scripts/create_guest_presence.py) performs
+both of those steps over Home Assistant's own APIs. Run it from a machine that
+can reach your instance:
+
+```sh
+export HA_URL=http://homeassistant.local:8123
+export HA_TOKEN=<long-lived access token>   # Profile -> Security
+python3 homeassistant/scripts/create_guest_presence.py --dry-run   # look first
+python3 homeassistant/scripts/create_guest_presence.py
+```
+
+Standard library only, no `pip install`. The token has to belong to an **admin**
+user, because creating a helper goes through the config flow API.
+
+It finds the Gorcho client-count sensor itself (override with `--source` if
+auto-detection is ambiguous), refuses to run on HA older than 2026.6, and is
+idempotent — a second run reports that both objects already exist and changes
+nothing. It never deletes anything. If a `Guest` person already exists it
+attaches the tracker to it rather than creating a duplicate.
+
 ## 2b. Install the package
 
 Copy `packages/villa_guest_presence.yaml` into `<config>/packages/`, and make
