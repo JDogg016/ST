@@ -1,0 +1,106 @@
+# Villa guest presence
+# ---------------------------------------------------------------------------
+# Turns activity on the "Gorcho" guest Wi-Fi into a Home Assistant person
+# called Guest, and switches guest mode on when Guest is the only one home.
+#
+# Drop this file in <config>/packages/ and make sure configuration.yaml has:
+#
+#   homeassistant:
+#     packages: !include_dir_named packages
+#
+# Requires Home Assistant 2026.6 or newer (that is when the template
+# device_tracker platform landed). See README.md for the older-version path.
+# ---------------------------------------------------------------------------
+
+template:
+  # 2. Count the clients on Gorcho ------------------------------------------
+  # The UniFi Network integration already publishes a per-SSID client counter:
+  # the "Clients" entity on the Gorcho WLAN device, i.e. sensor.gorcho_clients.
+  # This wrapper pins it to a stable entity_id we control and coerces
+  # unknown/unavailable to 0, so nothing downstream ever sees a non-numeric
+  # state when the controller is rebooting.
+  - sensor:
+      - name: Gorcho Guest Client Count
+        unique_id: villa_gorcho_guest_client_count
+        state: "{{ states('sensor.gorcho_clients') | int(0) }}"
+        state_class: measurement
+        unit_of_measurement: clients
+        icon: mdi:wifi
+
+  # Is anybody on Gorcho at all?
+  # delay_off is the grace period: the guest network has to stay empty for
+  # this long before Guest is allowed to leave, so a phone that drops Wi-Fi
+  # for a moment does not flap presence. There is no delay_on, so arrival is
+  # immediate.
+  - binary_sensor:
+      - name: Gorcho Guests Online
+        unique_id: villa_gorcho_guests_online
+        device_class: occupancy
+        state: "{{ states('sensor.gorcho_guest_client_count') | int(0) > 0 }}"
+        delay_off: "00:10:00"
+
+  # 3a. The tracker that backs the Guest person.
+  # in_zones -> ['zone.home'] resolves to state 'home'; an empty list resolves
+  # to 'not_home'. That is the whole mechanism.
+  - device_tracker:
+      - name: Guest WiFi
+        unique_id: villa_guest_wifi_tracker
+        in_zones: >
+          {{ ['zone.home']
+             if is_state('binary_sensor.gorcho_guests_online', 'on')
+             else [] }}
+
+# 3b. The person -----------------------------------------------------------
+# YAML persons and UI-created persons coexist, so this does not disturb
+# Matthew, Justin or Helen.
+person:
+  - name: Guest
+    id: villa_guest
+    device_trackers:
+      - device_tracker.guest_wifi
+
+# 5. Guest mode ------------------------------------------------------------
+input_boolean:
+  guest_mode:
+    name: Guest Mode
+    icon: mdi:account-supervisor
+
+automation:
+  - id: villa_guest_mode_follows_presence
+    alias: "Villa: guest mode when Guest is home alone"
+    description: >
+      Guest mode is on whenever the Guest person is home and none of the
+      household are. It switches back off as soon as either of those stops
+      being true.
+    mode: single
+    triggers:
+      - trigger: state
+        entity_id:
+          - person.guest
+          - person.matthew
+          - person.justin
+          - person.helen
+      - trigger: homeassistant
+        event: start
+    actions:
+      - choose:
+          - alias: Guest home, household all away
+            conditions:
+              - condition: state
+                entity_id: person.guest
+                state: home
+              # Deliberately "not home" rather than "== not_home": someone in
+              # a Work or School zone is still away as far as the villa cares.
+              - condition: template
+                value_template: >
+                  {{ not (is_state('person.matthew', 'home')
+                          or is_state('person.justin', 'home')
+                          or is_state('person.helen', 'home')) }}
+            sequence:
+              - action: input_boolean.turn_on
+                target:
+                  entity_id: input_boolean.guest_mode
+        default:
+          - action: input_boolean.turn_off
+            target:
+              entity_id: input_boolean.guest_mode
