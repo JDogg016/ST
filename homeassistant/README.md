@@ -33,7 +33,32 @@ top of the package file.
 > time**, 300s by default). That is already a few minutes of stickiness before
 > anything in this package gets involved.
 
-## 2. Install the package
+## 2a. The quick path (no YAML)
+
+Everything below can be done from the UI instead, which is the fastest way to
+get a working `person.guest`. You lose only the extra grace period.
+
+1. **Settings → Devices & services → Helpers → Create helper → Template →
+   Template a device tracker**
+   - Name: `Guest WiFi`
+   - In zones:
+     ```jinja
+     {{ ['zone.home'] if states('sensor.gorcho_clients') | int(0) > 0 else [] }}
+     ```
+2. **Settings → People → Add person**, name it `Guest`, and select
+   `device_tracker.guest_wifi` under "Select the device trackers for this
+   person". The helper has to exist first.
+
+UniFi's own detection time (300s by default) is already acting as a grace
+period here, so presence will not flap when a phone sleeps.
+
+Do **not** combine this with the package's `person:` and
+`template: - device_tracker:` blocks — you would end up with two persons named
+Guest and the second would become `person.guest_2`. If you later want the
+longer grace period, install the package with those two blocks deleted and
+repoint the helper's `in_zones` at `binary_sensor.gorcho_guests_online`.
+
+## 2b. Install the package
 
 Copy `packages/villa_guest_presence.yaml` into `<config>/packages/`, and make
 sure `configuration.yaml` has:
